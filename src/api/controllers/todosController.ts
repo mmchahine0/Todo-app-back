@@ -18,20 +18,55 @@ export const getTodoByUserId = async (
 ): Promise<void> => {
   try {
     const userId = getUserId(req);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 6;
+    const status = req.query.status as string | undefined;
 
-    const Todos = await prisma.todo.findMany({
-      where: {
-        userId: String(userId),
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    if (page < 1 || limit < 1) {
+      next(errorHandler(400, "Invalid pagination parameters"));
+      return;
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Build where clause with filters
+    const whereClause: any = {
+      userId: String(userId),
+    };
+
+    // Add status filter if provided
+    if (status === "completed") {
+      whereClause.completed = true;
+    } else if (status === "active") {
+      whereClause.completed = false;
+    }
+
+    // Get total count and todos in parallel
+    const [totalTodos, todos] = await Promise.all([
+      prisma.todo.count({
+        where: whereClause,
+      }),
+      prisma.todo.findMany({
+        where: whereClause,
+        orderBy: {
+          createdAt: "desc",
+        },
+        skip,
+        take: limit + 1,
+      }),
+    ]);
+
+    const hasMore = todos.length > limit;
+    const actualTodos = hasMore ? todos.slice(0, limit) : todos;
 
     res.json({
       statusCode: 200,
       message: "Todos retrieved successfully",
-      data: Todos,
+      data: actualTodos,
+      pagination: {
+        nextPage: hasMore ? page + 1 : null,
+        totalItems: totalTodos,
+      },
     });
   } catch (error: unknown) {
     if (
