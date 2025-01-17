@@ -3,8 +3,9 @@ import cors from "cors";
 import * as dotenv from "dotenv";
 import connectDB from "./database";
 import authRoutes from "./api/routes/authRoutes";
-import todoRoutes from "./api/routes/todosRoutes"
+import todoRoutes from "./api/routes/todosRoutes";
 import errorMiddleware from "../src/middleware/errorMiddleware";
+import userRoutes from "./api/routes/userRoutes";
 
 dotenv.config();
 
@@ -27,7 +28,7 @@ connectDB();
 
 // Routes
 app.use("/api/v1", todoRoutes);
-
+app.use("/api/v1", userRoutes);
 app.use("/api/v1", authRoutes);
 
 // Error handling middleware

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import prisma from "../../database/prismaClient";
 import { JwtPayload } from "jsonwebtoken";
 import { errorHandler } from "../../utils/error";
+// import redisClient from "../../utils/redis";
 
 const getUserId = (req: Request): string => {
   const user = req.user as JwtPayload;
@@ -27,21 +28,33 @@ export const getTodoByUserId = async (
       return;
     }
 
-    const skip = (page - 1) * limit;
+    // // Generate cache key
+    // const cacheKey = redisClient.generateTodosCacheKey(
+    //   userId,
+    //   page,
+    //   limit,
+    //   status
+    // );
 
-    // Build where clause with filters
+    // // Try to get data from cache first
+    // const cachedData = await redisClient.get(cacheKey);
+    // if (cachedData) {
+    //   res.json(cachedData);
+    //   return;
+    // }
+
+    // If not in cache, fetch from database
+    const skip = (page - 1) * limit;
     const whereClause: any = {
       userId: String(userId),
     };
 
-    // Add status filter if provided
     if (status === "completed") {
       whereClause.completed = true;
     } else if (status === "active") {
       whereClause.completed = false;
     }
 
-    // Get total count and todos in parallel
     const [totalTodos, todos] = await Promise.all([
       prisma.todo.count({
         where: whereClause,
@@ -59,7 +72,7 @@ export const getTodoByUserId = async (
     const hasMore = todos.length > limit;
     const actualTodos = hasMore ? todos.slice(0, limit) : todos;
 
-    res.json({
+    const response = {
       statusCode: 200,
       message: "Todos retrieved successfully",
       data: actualTodos,
@@ -67,7 +80,12 @@ export const getTodoByUserId = async (
         nextPage: hasMore ? page + 1 : null,
         totalItems: totalTodos,
       },
-    });
+    };
+
+    // Cache the response
+    // await redisClient.set(cacheKey, response);
+
+    res.json(response);
   } catch (error: unknown) {
     if (
       error instanceof Error &&
@@ -107,6 +125,8 @@ export const createTodo = async (
       },
     });
 
+    // await redisClient.clearCache();
+
     res.status(201).json({
       statusCode: 201,
       message: "Todo created successfully",
@@ -137,7 +157,6 @@ export const updateTodo = async (
     const { id } = req.params;
     const { title, content, completed } = req.body;
 
-    // Check if the todo exists and belongs to the user
     const existingTodo = await prisma.todo.findFirst({
       where: {
         id: String(id),
@@ -150,19 +169,16 @@ export const updateTodo = async (
       return;
     }
 
-    // Prepare update data using existing todo as fallback
     const updateData: {
       title?: string;
       content?: string;
       completed?: boolean;
     } = {};
 
-    // Only include fields that are provided in the request
     if (title !== undefined) updateData.title = title;
     if (content !== undefined) updateData.content = content;
     if (completed !== undefined) updateData.completed = completed;
 
-    // If no fields to update, return early
     if (Object.keys(updateData).length === 0) {
       next(errorHandler(400, "No valid fields provided for update"));
       return;
@@ -172,6 +188,8 @@ export const updateTodo = async (
       where: { id: String(id) },
       data: updateData,
     });
+
+    // await redisClient.clearCache();
 
     res.json({
       statusCode: 200,
@@ -217,6 +235,8 @@ export const deleteTodo = async (
     await prisma.todo.delete({
       where: { id: String(id) },
     });
+
+    // await redisClient.clearCache();
 
     res.status(200).json({
       statusCode: 200,
