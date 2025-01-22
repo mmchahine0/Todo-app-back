@@ -21,6 +21,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3500",
       "https://todo-1njtqu236-izcool337-gmailcoms-projects.vercel.app",
+      "https://todo-app-iota-plum-65.vercel.app/",
       "*",
     ],
     credentials: true,
