@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import prisma from "../../database/prismaClient";
 import { JwtPayload } from "jsonwebtoken";
 import { errorHandler } from "../../utils/error";
-// import redisClient from "../../utils/redis";
+import redisClient from "../../utils/redis";
 
 const getUserId = (req: Request): string => {
   const user = req.user as JwtPayload;
@@ -29,20 +29,19 @@ export const getTodoByUserId = async (
     }
 
     // // Generate cache key
-    // const cacheKey = redisClient.generateTodosCacheKey(
-    //   userId,
-    //   page,
-    //   limit,
-    //   status
-    // );
+    const cacheKey = redisClient.generateTodosCacheKey(
+      userId,
+      page,
+      limit,
+      status
+    );
 
-    // // Try to get data from cache first
-    // const cachedData = await redisClient.get(cacheKey);
-    // if (cachedData) {
-    //   res.json(cachedData);
-    //   return;
-    // }
-
+    // Try to get data from cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      res.json(cachedData);
+      return;
+    }
     // If not in cache, fetch from database
     const skip = (page - 1) * limit;
     const whereClause: any = {
@@ -82,8 +81,8 @@ export const getTodoByUserId = async (
       },
     };
 
-    // Cache the response
-    // await redisClient.set(cacheKey, response);
+    //Cache the response
+    await redisClient.set(cacheKey, response);
 
     res.json(response);
   } catch (error: unknown) {
@@ -125,7 +124,7 @@ export const createTodo = async (
       },
     });
 
-    // await redisClient.clearCache();
+    await redisClient.clearCache();
 
     res.status(201).json({
       statusCode: 201,
@@ -189,7 +188,7 @@ export const updateTodo = async (
       data: updateData,
     });
 
-    // await redisClient.clearCache();
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,
@@ -236,7 +235,7 @@ export const deleteTodo = async (
       where: { id: String(id) },
     });
 
-    // await redisClient.clearCache();
+    await redisClient.clearCache();
 
     res.status(200).json({
       statusCode: 200,
