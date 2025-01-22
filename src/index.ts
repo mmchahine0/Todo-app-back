@@ -20,7 +20,8 @@ app.use(
       "http://localhost:2500",
       "http://localhost:5173",
       "http://localhost:3500",
-      "*"
+      "https://todo-r73vxhaq0-izcool337-gmailcoms-projects.vercel.app",
+      "*",
     ],
     credentials: true,
   })
