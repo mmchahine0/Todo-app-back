@@ -3,7 +3,7 @@ import prisma from "../../database/prismaClient";
 import { JwtPayload } from "jsonwebtoken";
 import { errorHandler } from "../../utils/error";
 import bcrypt from "bcryptjs";
-// import redisClient from "../../utils/redis";
+import redisClient from "../../utils/redis";
 
 const getUserId = (req: Request): string => {
   const user = req.user as JwtPayload;
@@ -29,15 +29,15 @@ export const getUserProfile = async (
     const cacheKey = generateUserCacheKey(userId);
 
     // Try to get from cache
-    // const cachedUser = await redisClient.get(cacheKey);
-    // if (cachedUser) {
-    //   res.json({
-    //     statusCode: 200,
-    //     message: "User profile retrieved successfully",
-    //     data: cachedUser,
-    //   });
-    //   return;
-    // }
+    const cachedUser = await redisClient.get(cacheKey);
+    if (cachedUser) {
+      res.json({
+        statusCode: 200,
+        message: "User profile retrieved successfully",
+        data: cachedUser,
+      });
+      return;
+    }
 
     // If not in cache, get from database
     const user = await prisma.user.findUnique({
@@ -57,7 +57,7 @@ export const getUserProfile = async (
     }
 
     // Cache the user data
-    // await redisClient.set(cacheKey, user);
+    await redisClient.set(cacheKey, user);
 
     res.json({
       statusCode: 200,
