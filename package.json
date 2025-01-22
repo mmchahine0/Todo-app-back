@@ -13,7 +13,7 @@
   },
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "prisma generate && prisma migrate deploy && vite build",
+    "build": "npx prisma generate && npx prisma migrate deploy && vite build",
     "start": "node dist/index.js"
   },
   "name": "server",
