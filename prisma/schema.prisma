@@ -12,9 +12,16 @@ model User{
   email String  @unique
   password String 
   name  String?
+  role      Role       @default(USER)
+  suspended Boolean    @default(false)
   todos Todo[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 model Todo{
@@ -26,4 +33,11 @@ model Todo{
   completed Boolean  @default(false)
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+}
+
+model ContentSection {
+  id        String   @id @default(cuid())
+  type      String   @unique
+  content   Json
+  updatedAt DateTime @updatedAt @default(now())
 }

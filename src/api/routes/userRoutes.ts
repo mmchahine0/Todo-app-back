@@ -4,7 +4,7 @@ import {
   updateUserProfile,
   deleteUserAccount,
 } from "../controllers/userController";
-import { protect } from "../../middleware/authMiddleware";
+import { protect, checkSuspension } from "../../middleware/authMiddleware";
 import { apiLimiter } from "../../utils/rateLimiter";
 import { validateProfileUpdate } from "../validators/userValidators";
 
@@ -14,8 +14,13 @@ const router = Router();
 router.use("/user", apiLimiter);
 
 // Routes
-router.get("/user/profile", protect, getUserProfile);
-router.put("/user/profile", protect, validateProfileUpdate, updateUserProfile);
-router.delete("/user/profile", protect, deleteUserAccount);
-
+router.get("/user/profile", protect, checkSuspension, getUserProfile);
+router.put(
+  "/user/profile",
+  protect,
+  checkSuspension,
+  validateProfileUpdate,
+  updateUserProfile
+);
+router.delete("/user/profile", protect, checkSuspension, deleteUserAccount);
 export default router;

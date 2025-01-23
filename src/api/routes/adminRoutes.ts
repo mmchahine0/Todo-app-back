@@ -1,0 +1,22 @@
+import { Router } from "express";
+import { protect } from "../../middleware/authMiddleware";
+import { isAdmin } from "../validators/adminValidator";
+import {
+  makeAdmin,
+  revokeAdmin,
+  getAllUsers,
+  suspendUser,
+  unsuspendUser,
+} from "../controllers/adminController";
+
+const router = Router();
+
+router.use("/admin", protect, isAdmin);
+
+router.get("/admin/users", getAllUsers);
+router.put("/admin/users/:userId/make-admin", makeAdmin);
+router.put("/admin/users/:userId/revoke-admin", revokeAdmin);
+router.put("/admin/users/:userId/suspend", suspendUser);
+router.put("/admin/users/:userId/unsuspend", unsuspendUser);
+
+export default router;

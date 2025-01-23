@@ -50,6 +50,7 @@ export const signUp = async (
       data: {
         name,
         email,
+        role: "USER",
         password: hashedPassword,
       },
     });
@@ -61,6 +62,7 @@ export const signUp = async (
         name: user.name,
         id: user.id,
         email: user.email,
+        role: user.role,
       },
     });
   } catch (error: unknown) {
@@ -71,7 +73,6 @@ export const signUp = async (
     );
   }
 };
-
 export const signIn = async (
   req: Request,
   res: Response,
@@ -90,23 +91,30 @@ export const signIn = async (
     );
     return;
   }
-
   const { email, password } = req.body;
-
   try {
     const user = await prisma.user.findUnique({
-      where: {
-        email: email,
-      },
+      where: { email },
     });
-
     if (!user || !(await bcrypt.compare(password, user.password))) {
       next(errorHandler(401, "Invalid credentials"));
       return;
     }
 
+    if (user.suspended) {
+      next(errorHandler(403, "Account suspended"));
+      return;
+    }
     const accessToken = generateAccessToken(user.id.toString());
     const refreshToken = generateRefreshToken(user.id.toString());
+
+    // Set refresh token as HTTP-only cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 5 * 60 * 60 * 1000, // 5 hours
+    });
 
     res.json({
       statusCode: 200,
@@ -115,16 +123,12 @@ export const signIn = async (
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         accessToken,
-        refreshToken,
       },
     });
-  } catch (error: unknown) {
-    next(
-      error instanceof Error
-        ? errorHandler(500, `Failed to sign in: ${error.message}`)
-        : errorHandler(500, "Failed to sign in")
-    );
+  } catch (error) {
+    next(errorHandler(500, "Failed to sign in"));
   }
 };
 
@@ -160,6 +164,13 @@ export const refreshAccessToken = async (
   }
 
   try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      next(errorHandler(401, "No refresh token"));
+      return;
+    }
+
     const decoded = jwt.verify(
       refreshToken,
       process.env.JWT_REFRESH_SECRET as string
@@ -167,16 +178,25 @@ export const refreshAccessToken = async (
 
     const newAccessToken = generateAccessToken(decoded.userId);
 
+    // Optionally: Rotate refresh token for added security
+    const newRefreshToken = generateRefreshToken(decoded.userId);
+
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 5 * 60 * 60 * 1000,
+    });
+
     res.json({
       statusCode: 200,
-      message: "Access token refreshed successfully",
-      data: {
-        accessToken: newAccessToken,
-      },
+      message: "Token refreshed",
+      data: { accessToken: newAccessToken },
     });
   } catch (error) {
     if (error instanceof TokenExpiredError) {
-      next(errorHandler(401, "Refresh token has expired"));
+      res.clearCookie("refreshToken");
+      next(errorHandler(401, "Refresh token expired"));
       return;
     }
     next(errorHandler(401, "Invalid refresh token"));

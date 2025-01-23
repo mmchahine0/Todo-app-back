@@ -6,6 +6,8 @@ import authRoutes from "./api/routes/authRoutes";
 import todoRoutes from "./api/routes/todosRoutes";
 import errorMiddleware from "../src/middleware/errorMiddleware";
 import userRoutes from "./api/routes/userRoutes";
+import adminRoutes from "./api/routes/adminRoutes";
+import contentRoutes from "./api/routes/contentRoutes";
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ connectDB();
 app.use("/api/v1", todoRoutes);
 app.use("/api/v1", userRoutes);
 app.use("/api/v1", authRoutes);
+app.use("/api/v1", adminRoutes);
+app.use("/api/v1", contentRoutes);
 
 // Error handling middleware
 app.use(errorMiddleware);
