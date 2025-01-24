@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { protect } from "../../middleware/authMiddleware";
-import { isAdmin } from "../validators/adminValidator";
+import { isAdmin } from "../../middleware/adminMiddleware";
 import { getContent, updateContent } from "../controllers/contentController";
 
 const router = Router();

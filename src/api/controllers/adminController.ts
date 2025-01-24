@@ -1,8 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { errorHandler } from "../../utils/error";
+import redisClient from "../../utils/redis";
 
 const prisma = new PrismaClient();
+
 export const getAllUsers = async (
   req: Request,
   res: Response,
@@ -16,7 +18,13 @@ export const getAllUsers = async (
       next(errorHandler(400, "Invalid pagination parameters"));
       return;
     }
+    const cacheKey = redisClient.generateAdminUsersCacheKey(page, limit)
+    const cachedData = await redisClient.get(cacheKey)
 
+    if (cachedData) {
+      res.json(cachedData)
+      return
+    }
     const skip = (page - 1) * limit;
 
     const [totalUsers, users] = await Promise.all([
@@ -41,7 +49,7 @@ export const getAllUsers = async (
     const hasMore = users.length > limit;
     const actualUsers = hasMore ? users.slice(0, limit) : users;
 
-    res.json({
+    const responseData = {
       statusCode: 200,
       message: "Users retrieved successfully",
       data: actualUsers,
@@ -49,7 +57,10 @@ export const getAllUsers = async (
         nextPage: hasMore ? page + 1 : null,
         totalItems: totalUsers,
       },
-    });
+    }
+    await redisClient.set(cacheKey, responseData)
+
+    res.json(responseData);
   } catch (error: unknown) {
     next(
       error instanceof Error

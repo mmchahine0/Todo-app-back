@@ -5,7 +5,7 @@ import {
   updateTodo,
   deleteTodo,
 } from "../controllers/todosController";
-import { protect } from "../../middleware/authMiddleware";
+import { protect,checkSuspension } from "../../middleware/authMiddleware";
 import {
   createTodoValidation,
   updateTodoValidation,

@@ -1,4 +1,3 @@
-// src/utils/redis.ts
 import { createClient } from "redis";
 
 class RedisClient {
@@ -64,6 +63,16 @@ class RedisClient {
     status?: string
   ): string {
     return `todos:${userId}:${page}:${limit}:${status || "all"}`;
+  }
+
+  // Helper method to generate cache key for admin users table
+  public generateAdminUsersCacheKey(page: number, limit: number): string {
+    return `admin:users:${page}:${limit}`
+  }
+
+  // Helper method to generate cache key for content
+  public generateContentCacheKey(section?: string): string {
+    return section ? `content:${section}` : "content:all"
   }
 }
 

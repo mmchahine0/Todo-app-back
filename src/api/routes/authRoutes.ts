@@ -14,7 +14,7 @@ import { authLimiter, refreshTokenLimiter } from "../../utils/rateLimiter";
 const router = Router();
 
 // Apply stricter rate limiting to auth endpoints
-router.use("/auth/signin", authLimiter);
+router.use("/auth/signin",authLimiter);
 router.use("/auth/signup", authLimiter);
 router.use("/auth/refresh", refreshTokenLimiter);
 

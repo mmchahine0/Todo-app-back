@@ -1,20 +1,24 @@
 import { Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
-import { errorHandler } from "../../utils/error";
+import { errorHandler } from "../utils/error";
+import { JwtPayload } from "jsonwebtoken";
 
-const prisma = new PrismaClient();
 
+const getRole = (req: Request): string => {
+    const user = req.user as JwtPayload;
+    if (!user) {
+      throw new Error("User not found in token");
+    }
+    return user?.role;
+};
+  
 export const isAdmin = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user?.userId },
-    });
-
-    if (!user || user.role !== "ADMIN") {
+    const role = getRole(req);
+    if (!role || role !== "ADMIN") {
       next(errorHandler(403, "Access denied: Admin privileges required"));
       return;
     }

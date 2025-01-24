@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload, TokenExpiredError } from "jsonwebtoken";
 import { errorHandler } from "../utils/error";
-import { PrismaClient } from "@prisma/client";
 
 declare global {
   namespace Express {
@@ -17,7 +16,6 @@ export const protect = (
   next: NextFunction
 ): void => {
   const authHeader = req.headers["authorization"];
-
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next(errorHandler(403, "Access denied: invalid token format"));
   }
@@ -31,7 +29,7 @@ export const protect = (
     ) as JwtPayload;
     req.user = decoded;
 
-    next();
+    next()
   } catch (error) {
     if (error instanceof TokenExpiredError) {
       return next(errorHandler(401, "Unauthorized: Token has expired"));
@@ -39,7 +37,14 @@ export const protect = (
     next(errorHandler(401, "Unauthorized: Invalid token"));
   }
 };
-const prisma = new PrismaClient();
+
+const getUserSuspenssion = (req: Request): string => {
+  const user = req.user?.suspension as JwtPayload;
+  if (!user) {
+    throw new Error("User suspension status not found in token");
+  }
+  return user?.suspension;
+};
 
 export const checkSuspension = async (
   req: Request,
@@ -47,15 +52,12 @@ export const checkSuspension = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user?.userId },
-    });
 
-    if (user?.suspended) {
+    const suspended = getUserSuspenssion(req)
+    if (suspended) {
       next(errorHandler(403, "Account suspended. Please contact support."));
       return;
     }
-
     next();
   } catch (error) {
     next(errorHandler(500, "Failed to verify account status"));

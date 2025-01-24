@@ -63,6 +63,7 @@ export const signUp = async (
         id: user.id,
         email: user.email,
         role: user.role,
+        suspended: user.suspended
       },
     });
   } catch (error: unknown) {
@@ -105,8 +106,8 @@ export const signIn = async (
       next(errorHandler(403, "Account suspended"));
       return;
     }
-    const accessToken = generateAccessToken(user.id.toString());
-    const refreshToken = generateRefreshToken(user.id.toString());
+    const accessToken = generateAccessToken(user.id.toString(),user.role.toString(),user.suspended);
+    const refreshToken = generateRefreshToken(user.id.toString(),user.role.toString(),user.suspended);
 
     // Set refresh token as HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
@@ -124,6 +125,7 @@ export const signIn = async (
         name: user.name,
         email: user.email,
         role: user.role,
+        suspended: user.suspended,
         accessToken,
       },
     });
@@ -176,10 +178,10 @@ export const refreshAccessToken = async (
       process.env.JWT_REFRESH_SECRET as string
     ) as jwt.JwtPayload;
 
-    const newAccessToken = generateAccessToken(decoded.userId);
+    const newAccessToken = generateAccessToken(decoded.userId,decoded.role,decoded.suspended);
 
     // Optionally: Rotate refresh token for added security
-    const newRefreshToken = generateRefreshToken(decoded.userId);
+    const newRefreshToken = generateRefreshToken(decoded.userId,decoded.role,decoded.suspended);
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
