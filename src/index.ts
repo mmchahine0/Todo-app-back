@@ -8,6 +8,7 @@ import errorMiddleware from "../src/middleware/errorMiddleware";
 import userRoutes from "./api/routes/userRoutes";
 import adminRoutes from "./api/routes/adminRoutes";
 import contentRoutes from "./api/routes/contentRoutes";
+import dynamicpagesRoutes from "./api/routes/dynamicPagesRoutes"
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use("/api/v1", userRoutes);
 app.use("/api/v1", authRoutes);
 app.use("/api/v1", adminRoutes);
 app.use("/api/v1", contentRoutes);
+app.use("/api/v1", dynamicpagesRoutes);
 
 // Error handling middleware
 app.use(errorMiddleware);
