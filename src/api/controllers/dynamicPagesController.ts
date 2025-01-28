@@ -1,4 +1,3 @@
-// src/controllers/dynamicPagesController.ts
 import { NextFunction, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { errorHandler } from "../../utils/error";
@@ -13,7 +12,7 @@ export const getAllPages = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const cacheKey = 'dynamic_pages_all';
+    const cacheKey = "dynamic_pages_all";
     const cachedData = await redisClient.get(cacheKey);
 
     if (cachedData) {
@@ -23,7 +22,7 @@ export const getAllPages = async (
 
     const pages = await prisma.dynamicPage.findMany({
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       include: {
         createdBy: {
@@ -76,7 +75,7 @@ export const createPage = async (
       return;
     }
 
-    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    const formattedPath = path.startsWith("/") ? path : `/${path}`;
 
     const page = await prisma.dynamicPage.create({
       data: {
@@ -89,7 +88,7 @@ export const createPage = async (
     });
 
     // Invalidate cache
-    await redisClient.del('dynamic_pages_all');
+    await redisClient.del("dynamic_pages_all");
 
     res.status(201).json({
       statusCode: 201,
@@ -142,7 +141,7 @@ export const updatePage = async (
     });
 
     // Invalidate cache
-    await redisClient.del('dynamic_pages_all');
+    await redisClient.del("dynamic_pages_all");
 
     res.json({
       statusCode: 200,
@@ -171,7 +170,7 @@ export const deletePage = async (
     });
 
     // Invalidate cache
-    await redisClient.del('dynamic_pages_all');
+    await redisClient.del("dynamic_pages_all");
 
     res.json({
       statusCode: 200,
@@ -192,7 +191,7 @@ export const getPublishedPages = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const cacheKey = 'dynamic_pages_published';
+    const cacheKey = "dynamic_pages_published";
     const cachedData = await redisClient.get(cacheKey);
 
     if (cachedData) {
@@ -205,7 +204,7 @@ export const getPublishedPages = async (
         isPublished: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -220,7 +219,10 @@ export const getPublishedPages = async (
   } catch (error: unknown) {
     next(
       error instanceof Error
-        ? errorHandler(500, `Failed to retrieve published pages: ${error.message}`)
+        ? errorHandler(
+            500,
+            `Failed to retrieve published pages: ${error.message}`
+          )
         : errorHandler(500, "Failed to retrieve published pages")
     );
   }

@@ -63,7 +63,7 @@ export const signUp = async (
         id: user.id,
         email: user.email,
         role: user.role,
-        suspended: user.suspended
+        suspended: user.suspended,
       },
     });
   } catch (error: unknown) {
@@ -106,8 +106,16 @@ export const signIn = async (
       next(errorHandler(403, "Account suspended"));
       return;
     }
-    const accessToken = generateAccessToken(user.id.toString(),user.role.toString(),user.suspended);
-    const refreshToken = generateRefreshToken(user.id.toString(),user.role.toString(),user.suspended);
+    const accessToken = generateAccessToken(
+      user.id.toString(),
+      user.role.toString(),
+      user.suspended
+    );
+    const refreshToken = generateRefreshToken(
+      user.id.toString(),
+      user.role.toString(),
+      user.suspended
+    );
 
     // Set refresh token as HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
@@ -139,32 +147,6 @@ export const refreshAccessToken = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    next(
-      errorHandler(
-        400,
-        errors
-          .array()
-          .map((err) => err.msg)
-          .join(", ")
-      )
-    );
-    return;
-  }
-
-  const { refreshToken } = req.body;
-
-  if (!refreshToken) {
-    next(errorHandler(400, "Refresh token is required"));
-    return;
-  }
-
-  if (typeof refreshToken !== "string") {
-    next(errorHandler(400, "Invalid refresh token format"));
-    return;
-  }
-
   try {
     const refreshToken = req.cookies.refreshToken;
 
@@ -178,10 +160,18 @@ export const refreshAccessToken = async (
       process.env.JWT_REFRESH_SECRET as string
     ) as jwt.JwtPayload;
 
-    const newAccessToken = generateAccessToken(decoded.userId,decoded.role,decoded.suspended);
+    const newAccessToken = generateAccessToken(
+      decoded.userId,
+      decoded.role,
+      decoded.suspended
+    );
 
     // Optionally: Rotate refresh token for added security
-    const newRefreshToken = generateRefreshToken(decoded.userId,decoded.role,decoded.suspended);
+    const newRefreshToken = generateRefreshToken(
+      decoded.userId,
+      decoded.role,
+      decoded.suspended
+    );
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,

@@ -8,7 +8,8 @@ import errorMiddleware from "../src/middleware/errorMiddleware";
 import userRoutes from "./api/routes/userRoutes";
 import adminRoutes from "./api/routes/adminRoutes";
 import contentRoutes from "./api/routes/contentRoutes";
-import dynamicpagesRoutes from "./api/routes/dynamicPagesRoutes"
+import dynamicpagesRoutes from "./api/routes/dynamicPagesRoutes";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 connectDB();
 
 // Routes
