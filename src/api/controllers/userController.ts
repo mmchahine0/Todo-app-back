@@ -167,8 +167,7 @@ export const updateUserProfile = async (
     });
 
     // Invalidate cache
-    const cacheKey = generateUserCacheKey(userId);
-    // await redisClient.del(cacheKey);
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,
@@ -233,8 +232,7 @@ export const deleteUserAccount = async (
     ]);
 
     // Clear user cache
-    const cacheKey = generateUserCacheKey(userId);
-    // await redisClient.del(cacheKey);
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,

@@ -67,12 +67,12 @@ class RedisClient {
 
   // Helper method to generate cache key for admin users table
   public generateAdminUsersCacheKey(page: number, limit: number): string {
-    return `admin:users:${page}:${limit}`
+    return `admin:users:${page}:${limit}`;
   }
 
   // Helper method to generate cache key for content
   public generateContentCacheKey(section?: string): string {
-    return section ? `content:${section}` : "content:all"
+    return section ? `content:${section}` : "content:all";
   }
 }
 

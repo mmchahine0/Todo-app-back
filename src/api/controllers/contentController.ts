@@ -92,12 +92,7 @@ export const updateContent = async (
         const canAddPath = await checkPathExists(content.path);
 
         if (!canAddPath) {
-          next(
-            errorHandler(
-              400,
-              "Path either doesn't exist as a page or is already in navigation"
-            )
-          );
+          next(errorHandler(400, "Path doesn't exist as a page"));
           return;
         }
       }
@@ -114,10 +109,7 @@ export const updateContent = async (
           const canAddPath = await checkPathExists(item.path);
           if (!canAddPath) {
             next(
-              errorHandler(
-                400,
-                `Path ${item.path} either doesn't exist as a page`
-              )
+              errorHandler(400, `Path ${item.path} doesn't exist as a page`)
             );
             return;
           }
@@ -134,11 +126,7 @@ export const updateContent = async (
       },
     });
 
-    // Invalidate the cache for the specific section and the entire content
-    await Promise.all([
-      redisClient.del(redisClient.generateContentCacheKey(section)),
-      redisClient.del(redisClient.generateContentCacheKey()),
-    ]);
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,

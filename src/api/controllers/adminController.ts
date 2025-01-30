@@ -18,12 +18,12 @@ export const getAllUsers = async (
       next(errorHandler(400, "Invalid pagination parameters"));
       return;
     }
-    const cacheKey = redisClient.generateAdminUsersCacheKey(page, limit)
-    const cachedData = await redisClient.get(cacheKey)
+    const cacheKey = redisClient.generateAdminUsersCacheKey(page, limit);
+    const cachedData = await redisClient.get(cacheKey);
 
     if (cachedData) {
-      res.json(cachedData)
-      return
+      res.json(cachedData);
+      return;
     }
     const skip = (page - 1) * limit;
 
@@ -57,8 +57,8 @@ export const getAllUsers = async (
         nextPage: hasMore ? page + 1 : null,
         totalItems: totalUsers,
       },
-    }
-    await redisClient.set(cacheKey, responseData)
+    };
+    await redisClient.set(cacheKey, responseData);
 
     res.json(responseData);
   } catch (error: unknown) {
@@ -82,6 +82,8 @@ export const makeAdmin = async (
       where: { id: userId },
       data: { role: "ADMIN" },
     });
+
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,
@@ -114,6 +116,8 @@ export const revokeAdmin = async (
       data: { role: "USER" },
     });
 
+    await redisClient.clearCache();
+
     res.json({
       statusCode: 200,
       message: "Admin role revoked",
@@ -145,6 +149,8 @@ export const suspendUser = async (
       data: { suspended: true },
     });
 
+    await redisClient.clearCache();
+
     res.json({
       statusCode: 200,
       message: "User suspended",
@@ -171,6 +177,8 @@ export const unsuspendUser = async (
       where: { id: userId },
       data: { suspended: false },
     });
+
+    await redisClient.clearCache();
 
     res.json({
       statusCode: 200,
