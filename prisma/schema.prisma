@@ -7,17 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User{
-  id    String     @id @default(cuid())
-  email String  @unique
-  password String 
-  name  String?
-  role      Role       @default(USER)
-  suspended Boolean    @default(false)
-  todos Todo[]
+model User {
+  id           String        @id @default(cuid())
+  email        String       @unique
+  password     String 
+  name         String?
+  role         Role         @default(USER)
+  suspended    Boolean      @default(false)
+  todos        Todo[]
   dynamicPages DynamicPage[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt @default(now())
 }
 
 enum Role {
@@ -25,32 +25,47 @@ enum Role {
   ADMIN
 }
 
-model Todo{
-  id        String      @id @default(cuid())
+model Todo {
+  id        String    @id @default(cuid())
   title     String
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
-  completed Boolean  @default(false)
-  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt @default(now())
+  completed Boolean   @default(false)
+  user      User      @relation(fields: [userId], references: [id])
   userId    String
 }
 
 model DynamicPage {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
-  path        String    @unique
-  content     Json      
-  isPublished Boolean   @default(false)
-  createdBy   User      @relation(fields: [userId], references: [id])
+  path        String        @unique
+  content     Json         
+  isPublished Boolean       @default(false)
+  createdBy   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  layout      String       @default("base")
+  isProtected Boolean      @default(false)
+  admin       Boolean      @default(false)
+  pageContent PageContent[] 
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model PageContent {
+  id        String      @id @default(cuid())
+  type      String      
+  content   Json
+  page      DynamicPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId    String
+  updatedAt DateTime    @updatedAt @default(now())
+
+  @@unique([pageId, type])
 }
 
 model ContentSection {
-  id        String   @id @default(cuid())
-  type      String   @unique
-  content   Json
-  updatedAt DateTime @updatedAt @default(now())
+  id        String    @id @default(cuid())
+  type      String    @unique  
+  content   Json      
+  updatedAt DateTime  @updatedAt @default(now())
 }

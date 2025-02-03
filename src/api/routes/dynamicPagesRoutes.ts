@@ -1,4 +1,3 @@
-// src/routes/dynamicPagesRoutes.ts
 import { Router } from "express";
 import { protect } from "../../middleware/authMiddleware";
 import { isAdmin } from "../../middleware/adminMiddleware";
@@ -14,10 +13,10 @@ const router = Router();
 
 // Public routes
 router.get("/pages/published", getPublishedPages);
+router.get("/pages", getAllPages);
 
 // Admin routes
 router.use("/admin/pages", protect, isAdmin);
-router.get("/admin/pages", getAllPages);
 router.post("/admin/pages", createPage);
 router.put("/admin/pages/:id", updatePage);
 router.delete("/admin/pages/:id", deletePage);

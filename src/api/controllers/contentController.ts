@@ -14,32 +14,18 @@ type NavItem = {
 const checkPathExists = async (path: string): Promise<boolean> => {
   try {
     const formattedPath = path.startsWith("/") ? path : `/${path}`;
-
-    // Get navbar content
-    const navContent = await prisma.contentSection.findUnique({
-      where: { type: "navbar" },
-    });
-
-    // Get dynamic page
+    
     const existingPage = await prisma.dynamicPage.findUnique({
       where: { path: formattedPath },
     });
-    // If no page exists for this path, return false
-    if (existingPage == null) {
-      return false;
-    }
 
-    // If navbar doesn't exist yet, but page exists, return true
-    if (!navContent) {
-      return true;
-    }
-
-    return true;
+    return !!existingPage;
   } catch (error) {
-    console.error("Error checking path in navbar:", error);
+    console.error("Error checking path:", error);
     throw error;
   }
 };
+
 export const getContent = async (
   req: Request,
   res: Response,
@@ -64,7 +50,6 @@ export const getContent = async (
       return acc;
     }, {} as Record<string, any>);
 
-    // Cache the formatted content
     await redisClient.set(cacheKey, formattedContent);
 
     res.json({
@@ -86,37 +71,37 @@ export const updateContent = async (
   const content = req.body;
 
   try {
+    // Validate paths for navigation items
     if (section === "navbar") {
-      // If it's a single item being added
-      if (content.path) {
-        const canAddPath = await checkPathExists(content.path);
-
-        if (!canAddPath) {
-          next(errorHandler(400, "Path doesn't exist as a page"));
-          return;
-        }
-      }
-
-      // If it's an array of items
-      else if (Array.isArray(content)) {
-        // Check any new items being added
-        const currentNav = await prisma.contentSection.findUnique({
-          where: { type: "navbar" },
-        });
-        const currentItems = (currentNav?.content as NavItem[]) || [];
-        // Check each item
-        for (const item of currentItems) {
-          const canAddPath = await checkPathExists(item.path);
-          if (!canAddPath) {
-            next(
-              errorHandler(400, `Path ${item.path} doesn't exist as a page`)
-            );
+      const navItems = Array.isArray(content) ? content : [content];
+      for (const item of navItems) {
+        if (item.path) {
+          const pathExists = await checkPathExists(item.path);
+          if (!pathExists) {
+            next(errorHandler(400, `Path ${item.path} doesn't exist as a page`));
             return;
           }
         }
       }
     }
 
+    // Validate features content
+    if (section === "features") {
+      if (!content.title || !Array.isArray(content.items)) {
+        next(errorHandler(400, "Invalid features content structure"));
+        return;
+      }
+    }
+
+    // Validate statistics content
+    if (section === "statistics") {
+      if (!Array.isArray(content.items)) {
+        next(errorHandler(400, "Invalid statistics content structure"));
+        return;
+      }
+    }
+
+    // Update or create the content section
     await prisma.contentSection.upsert({
       where: { type: section },
       update: { content },

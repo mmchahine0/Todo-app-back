@@ -10,7 +10,7 @@ export const generateAccessToken = (userId: string, role:string,suspended:boolea
   const payload: Payload = { userId,role,suspended };
 
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {
-    expiresIn: "30m",
+    expiresIn: "8h",
   });
 
   return accessToken;

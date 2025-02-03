@@ -7,7 +7,8 @@ import todoRoutes from "./api/routes/todosRoutes";
 import errorMiddleware from "../src/middleware/errorMiddleware";
 import userRoutes from "./api/routes/userRoutes";
 import adminRoutes from "./api/routes/adminRoutes";
-import contentRoutes from "./api/routes/contentRoutes";
+import pageContentRoutes from "./api/routes/pageContentRoutes";
+import contentRoutes from "./api/routes/contentRoutes"
 import dynamicpagesRoutes from "./api/routes/dynamicPagesRoutes";
 import cookieParser from "cookie-parser";
 
@@ -24,7 +25,6 @@ app.use(
       "http://localhost:2500",
       "http://localhost:5173",
       "http://localhost:3500",
-      "https://todo-1njtqu236-izcool337-gmailcoms-projects.vercel.app",
       "https://todo-app-iota-plum-65.vercel.app",
       "*",
     ],
@@ -39,6 +39,7 @@ app.use("/api/v1", todoRoutes);
 app.use("/api/v1", userRoutes);
 app.use("/api/v1", authRoutes);
 app.use("/api/v1", adminRoutes);
+app.use("/api/v1", pageContentRoutes);
 app.use("/api/v1", contentRoutes);
 app.use("/api/v1", dynamicpagesRoutes);
 
