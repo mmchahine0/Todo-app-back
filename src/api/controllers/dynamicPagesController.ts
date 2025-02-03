@@ -41,9 +41,6 @@ export const getAllPages = async (
     };
 
     await redisClient.set(cacheKey, responseData);
-    console.log(
-      "allpages called"
-    )
     res.json(responseData);
   } catch (error: unknown) {
     next(
