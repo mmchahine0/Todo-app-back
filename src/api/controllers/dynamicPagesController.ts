@@ -57,7 +57,7 @@ export const createPage = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { title, path, content } = req.body;
+    const { title, path, content, layout, isProtected, admin } = req.body;
     const user = req.user as JwtPayload;
 
     if (!user?.userId) {
@@ -82,6 +82,9 @@ export const createPage = async (
         title,
         path: formattedPath,
         content,
+        layout,
+        isProtected,
+        admin,
         userId: user.userId,
         isPublished: false,
       },
@@ -111,7 +114,7 @@ export const updatePage = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, path, content, isPublished } = req.body;
+    const { title, path, content, isPublished, layout, isProtected, admin } = req.body;
 
     // Check if new path already exists (if path is being updated)
     if (path) {
@@ -137,6 +140,9 @@ export const updatePage = async (
         path,
         content,
         isPublished,
+        layout,
+        isProtected,
+        admin,
       },
     });
 
@@ -219,10 +225,7 @@ export const getPublishedPages = async (
   } catch (error: unknown) {
     next(
       error instanceof Error
-        ? errorHandler(
-            500,
-            `Failed to retrieve published pages: ${error.message}`
-          )
+        ? errorHandler(500, `Failed to retrieve published pages: ${error.message}`)
         : errorHandler(500, "Failed to retrieve published pages")
     );
   }
