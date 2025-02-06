@@ -1,13 +1,13 @@
 import { Router } from "express";
-import { protect } from "../../middleware/authMiddleware";
-import { isAdmin } from "../../middleware/adminMiddleware";
+import { protect } from "../../../../middleware/authMiddleware";
+import { isAdmin } from "../../../../middleware/adminMiddleware";
 import {
   getAllPages,
   createPage,
   updatePage,
   deletePage,
   getPublishedPages,
-} from "../controllers/dynamicPagesController";
+} from "./dynamicPages.controller";
 
 const router = Router();
 

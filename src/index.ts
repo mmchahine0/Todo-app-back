@@ -2,14 +2,14 @@ import express from "express";
 import cors from "cors";
 import * as dotenv from "dotenv";
 import connectDB from "./database";
-import authRoutes from "./api/routes/authRoutes";
-import todoRoutes from "./api/routes/todosRoutes";
+import authRoutes from "./features/auth/auth.route";
+import todoRoutes from "./features/todos/todos.route";
 import errorMiddleware from "../src/middleware/errorMiddleware";
-import userRoutes from "./api/routes/userRoutes";
-import adminRoutes from "./api/routes/adminRoutes";
-import pageContentRoutes from "./api/routes/pageContentRoutes";
-import contentRoutes from "./api/routes/contentRoutes"
-import dynamicpagesRoutes from "./api/routes/dynamicPagesRoutes";
+import userRoutes from "./features/user/user.route";
+import adminRoutes from "./features/admin/admin.route";
+import pageContentRoutes from "./features/admin/pages/pageContent.route";
+import contentRoutes from "./features/admin/content/content.route";
+import dynamicpagesRoutes from "./features/admin/pages/dynamic/dynamicPages.route";
 import cookieParser from "cookie-parser";
 
 dotenv.config();
@@ -20,14 +20,7 @@ const port = process.env.PORT || 3500;
 app.use(express.json());
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:2500",
-      "http://localhost:5173",
-      "http://localhost:3500",
-      "https://todo-app-iota-plum-65.vercel.app",
-      "*",
-    ],
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
   })
 );

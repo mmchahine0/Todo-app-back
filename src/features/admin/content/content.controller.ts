@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { errorHandler } from "../../utils/error";
+import { errorHandler } from "../../../utils/error";
 import { PrismaClient } from "@prisma/client";
-import redisClient from "../../utils/redis";
+import redisClient from "../../../utils/redis";
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,7 @@ type NavItem = {
 const checkPathExists = async (path: string): Promise<boolean> => {
   try {
     const formattedPath = path.startsWith("/") ? path : `/${path}`;
-    
+
     const existingPage = await prisma.dynamicPage.findUnique({
       where: { path: formattedPath },
     });
@@ -78,7 +78,9 @@ export const updateContent = async (
         if (item.path) {
           const pathExists = await checkPathExists(item.path);
           if (!pathExists) {
-            next(errorHandler(400, `Path ${item.path} doesn't exist as a page`));
+            next(
+              errorHandler(400, `Path ${item.path} doesn't exist as a page`)
+            );
             return;
           }
         }

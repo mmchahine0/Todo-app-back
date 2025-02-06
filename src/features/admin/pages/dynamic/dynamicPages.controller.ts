@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { errorHandler } from "../../utils/error";
+import { errorHandler } from "../../../../utils/error";
 import { JwtPayload } from "jsonwebtoken";
-import redisClient from "../../utils/redis";
+import redisClient from "../../../../utils/redis";
 
 const prisma = new PrismaClient();
 
@@ -114,7 +114,8 @@ export const updatePage = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, path, content, isPublished, layout, isProtected, admin } = req.body;
+    const { title, path, content, isPublished, layout, isProtected, admin } =
+      req.body;
 
     // Check if new path already exists (if path is being updated)
     if (path) {
@@ -225,7 +226,10 @@ export const getPublishedPages = async (
   } catch (error: unknown) {
     next(
       error instanceof Error
-        ? errorHandler(500, `Failed to retrieve published pages: ${error.message}`)
+        ? errorHandler(
+            500,
+            `Failed to retrieve published pages: ${error.message}`
+          )
         : errorHandler(500, "Failed to retrieve published pages")
     );
   }

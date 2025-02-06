@@ -7,7 +7,7 @@ import {
   getAllUsers,
   suspendUser,
   unsuspendUser,
-} from "../controllers/adminController";
+} from "./admin.controller";
 
 const router = Router();
 

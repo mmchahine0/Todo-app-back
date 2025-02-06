@@ -1,13 +1,6 @@
 import { Router } from "express";
-import {
-  signUp,
-  signIn,
-  refreshAccessToken,
-} from "../controllers/authController";
-import {
-  signupValidation,
-  signinValidation,
-} from "../validators/authValidator";
+import { signUp, signIn, refreshAccessToken } from "./auth.controller";
+import { signupValidation, signinValidation } from "./auth.validation";
 import { authLimiter, refreshTokenLimiter } from "../../utils/rateLimiter";
 
 const router = Router();

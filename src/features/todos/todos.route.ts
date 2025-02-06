@@ -4,13 +4,13 @@ import {
   createTodo,
   updateTodo,
   deleteTodo,
-} from "../controllers/todosController";
-import { protect,checkSuspension } from "../../middleware/authMiddleware";
+} from "./todos.controller";
+import { protect, checkSuspension } from "../../middleware/authMiddleware";
 import {
   createTodoValidation,
   updateTodoValidation,
   paginationValidation,
-} from "../validators/todoValidation";
+} from "./todos.validation";
 import { apiLimiter } from "../../utils/rateLimiter";
 
 const router = Router();

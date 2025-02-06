@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { errorHandler } from "../../utils/error";
+import { errorHandler } from "../../../utils/error";
 import { PrismaClient } from "@prisma/client";
-import redisClient from "../../utils/redis";
+import redisClient from "../../../utils/redis";
 
 const prisma = new PrismaClient();
 
@@ -26,8 +26,8 @@ export const getContent = async (
 
     const content = await prisma.pageContent.findMany({
       where: {
-        pageId
-      }
+        pageId,
+      },
     });
 
     const formattedContent = content.reduce((acc, item) => {
@@ -59,7 +59,7 @@ export const updateContent = async (
   try {
     // Check if the page exists
     const page = await prisma.dynamicPage.findUnique({
-      where: { id: pageId }
+      where: { id: pageId },
     });
 
     if (!page) {
@@ -71,14 +71,14 @@ export const updateContent = async (
       where: {
         pageId_type: {
           pageId,
-          type: section
-        }
+          type: section,
+        },
       },
       update: { content },
       create: {
         pageId,
         type: section,
-        content
+        content,
       },
     });
 
