@@ -7,9 +7,11 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../../utils/generateToken";
+import { OTPService, generateSecureOTP } from "../../utils/emailService";
 import jwt, { TokenExpiredError } from "jsonwebtoken";
 
 const prisma = new PrismaClient();
+const otpService = new OTPService();
 
 export const signUp = async (
   req: Request,
@@ -34,9 +36,7 @@ export const signUp = async (
 
   try {
     const userExists = await prisma.user.findUnique({
-      where: {
-        email,
-      },
+      where: { email },
     });
 
     if (userExists) {
@@ -45,6 +45,8 @@ export const signUp = async (
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const { code, hash } = generateSecureOTP();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     const user = await prisma.user.create({
       data: {
@@ -52,18 +54,24 @@ export const signUp = async (
         email,
         role: "USER",
         password: hashedPassword,
+        verificationCode: {
+          create: {
+            code: hash,
+            expiresAt,
+          },
+        },
       },
     });
 
+    await otpService.generateAndSendOTP(email, "VERIFICATION");
+
     res.status(201).json({
       statusCode: 201,
-      message: "User created",
+      message: "User created. Please check your email for verification code.",
       data: {
         name: user.name,
         id: user.id,
         email: user.email,
-        role: user.role,
-        suspended: user.suspended,
       },
     });
   } catch (error: unknown) {
@@ -74,31 +82,27 @@ export const signUp = async (
     );
   }
 };
+
 export const signIn = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    next(
-      errorHandler(
-        400,
-        errors
-          .array()
-          .map((err) => err.msg)
-          .join(", ")
-      )
-    );
-    return;
-  }
   const { email, password } = req.body;
   try {
     const user = await prisma.user.findUnique({
       where: { email },
     });
+
     if (!user || !(await bcrypt.compare(password, user.password))) {
       next(errorHandler(401, "Invalid credentials"));
+      return;
+    }
+
+    if (!user.isVerified) {
+      next(
+        errorHandler(403, "Email not verified. Please verify your email first.")
+      );
       return;
     }
 
@@ -106,6 +110,7 @@ export const signIn = async (
       next(errorHandler(403, "Account suspended"));
       return;
     }
+
     const accessToken = generateAccessToken(
       user.id.toString(),
       user.role.toString(),
@@ -117,12 +122,11 @@ export const signIn = async (
       user.suspended
     );
 
-    // Set refresh token as HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 5 * 60 * 60 * 1000, // 5 hours
+      maxAge: 5 * 60 * 60 * 1000,
     });
 
     res.json({
@@ -141,7 +145,132 @@ export const signIn = async (
     next(errorHandler(500, "Failed to sign in"));
   }
 };
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { email, code } = req.body;
 
+  try {
+    const isValid = await otpService.verifyOTP(email, code, "VERIFICATION");
+
+    if (!isValid) {
+      next(errorHandler(400, "Invalid or expired verification code"));
+      return;
+    }
+
+    await prisma.user.update({
+      where: { email },
+      data: { isVerified: true },
+    });
+
+    res.json({
+      statusCode: 200,
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    next(errorHandler(500, "Failed to verify email"));
+  }
+};
+
+export const requestPasswordReset = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { email } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (user) {
+      await otpService.generateAndSendOTP(email, "PASSWORD_RESET");
+    }
+
+    // Return same response regardless of whether user exists
+    res.json({
+      statusCode: 200,
+      message:
+        "If your email is registered, you will receive a password reset code.",
+    });
+  } catch (error) {
+    next(errorHandler(500, "Failed to process password reset request"));
+  }
+};
+
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { email, code, newPassword } = req.body;
+
+  try {
+    const isValid = await otpService.verifyOTP(email, code, "PASSWORD_RESET");
+
+    if (!isValid) {
+      next(errorHandler(400, "Invalid or expired reset code"));
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword },
+    });
+
+    res.json({
+      statusCode: 200,
+      message: "Password reset successful",
+    });
+  } catch (error) {
+    next(errorHandler(500, "Failed to reset password"));
+  }
+};
+
+export const resendVerificationCode = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { email } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // Return success even if user doesn't exist (security best practice)
+      res.json({
+        statusCode: 200,
+        message:
+          "If your email is registered, a new verification code will be sent.",
+      });
+      return;
+    }
+
+    if (user.isVerified) {
+      next(errorHandler(400, "Email is already verified"));
+      return;
+    }
+
+    // Generate and send new OTP
+    await otpService.generateAndSendOTP(email, "VERIFICATION");
+
+    res.json({
+      statusCode: 200,
+      message:
+        "If your email is registered, a new verification code will be sent.",
+    });
+  } catch (error) {
+    next(errorHandler(500, "Failed to resend verification code"));
+  }
+};
 export const refreshAccessToken = async (
   req: Request,
   res: Response,
