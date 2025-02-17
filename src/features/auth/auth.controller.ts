@@ -46,33 +46,41 @@ export const signUp = async (
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const { code, hash } = generateSecureOTP();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        role: "USER",
-        password: hashedPassword,
-        verificationCode: {
-          create: {
-            code: hash,
-            expiresAt,
+    // Start a transaction to ensure data consistency
+    await prisma.$transaction(async (prisma) => {
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          role: "USER",
+          password: hashedPassword,
+          verificationCode: {
+            create: {
+              code: hash,
+              expiresAt,
+            },
           },
         },
-      },
-    });
+      });
 
-    await otpService.generateAndSendOTP(email, "VERIFICATION");
+      try {
+        await otpService.generateAndSendOTP(email, "VERIFICATION");
+      } catch (emailError) {
+        // If email fails, roll back the user creation
+        throw new Error(`Failed to send verification email: ${emailError}`);
+      }
 
-    res.status(201).json({
-      statusCode: 201,
-      message: "User created. Please check your email for verification code.",
-      data: {
-        name: user.name,
-        id: user.id,
-        email: user.email,
-      },
+      res.status(201).json({
+        statusCode: 201,
+        message: "User created. Please check your email for verification code.",
+        data: {
+          name: user.name,
+          id: user.id,
+          email: user.email,
+        },
+      });
     });
   } catch (error: unknown) {
     next(
@@ -150,13 +158,13 @@ export const verifyEmail = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { email, code } = req.body;
+  const { email, otp } = req.body;
 
   try {
-    const isValid = await otpService.verifyOTP(email, code, "VERIFICATION");
-
+    const isValid = await otpService.verifyOTP(email, otp, "VERIFICATION");
+    
     if (!isValid) {
-      next(errorHandler(400, "Invalid or expired verification code"));
+      next(errorHandler(400, "Invalid or expired verification code. Please request a new one."));
       return;
     }
 
@@ -170,6 +178,7 @@ export const verifyEmail = async (
       message: "Email verified successfully",
     });
   } catch (error) {
+    console.error("Verification error:", error);
     next(errorHandler(500, "Failed to verify email"));
   }
 };

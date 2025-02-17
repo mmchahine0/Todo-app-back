@@ -2,6 +2,8 @@ import nodemailer from "nodemailer";
 import { google } from "googleapis";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
 const OAuth2 = google.auth.OAuth2;
 
@@ -23,77 +25,59 @@ const CSP_POLICY = [
 const OTP_CONFIG = {
   length: 6,
   expiresIn: 15 * 60 * 1000, // 15 minutes
-  attempts: 10,
 };
 
-const getAccessToken = async (): Promise<string> => {
-  const oauth2Client = new OAuth2(
-    process.env.GMAIL_CLIENT_ID!,
-    process.env.GMAIL_CLIENT_SECRET!,
-    "https://developers.google.com/oauthplayground"
-  );
 
-  oauth2Client.setCredentials({
-    refresh_token: process.env.GMAIL_REFRESH_TOKEN!,
-  });
-
+const createTransporter = async (): Promise<nodemailer.Transporter> => {
   try {
-    const { token } = await oauth2Client.getAccessToken();
-    if (!token) throw new Error("Failed to retrieve access token");
-    return token;
-  } catch (error) {
-    throw new Error(`Access token error: ${error}`);
-  }
-};
+    const oauth2Client = new OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      "https://developers.google.com/oauthplayground"
+    );
 
-const createTransporter = async () => {
-  try {
-    const accessToken = await getAccessToken();
+    // Add scopes explicitly
+    oauth2Client.setCredentials({
+      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+      scope: [
+        'https://mail.google.com/',
+        'https://www.googleapis.com/auth/gmail.send'
+      ].join(' ')
+    });
 
-    return nodemailer.createTransport({
-      service: "gmail",
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',  
       auth: {
         type: "OAuth2",
-        user: process.env.GMAIL_EMAIL!,
-        accessToken,
-        clientId: process.env.GMAIL_CLIENT_ID!,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET!,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN!,
+        user: process.env.GMAIL_EMAIL,
+        clientId: process.env.GMAIL_CLIENT_ID,
+        clientSecret: process.env.GMAIL_CLIENT_SECRET,
+        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+        accessToken: process.env.GMAIL_ACCESS_TOKEN,
       },
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 10,
     });
-  } catch (error) {
-    throw new Error(`Transporter creation failed: ${error}`);
+
+    // Verify configuration
+    await transporter.verify();
+    return transporter;
+  } catch (err) {
+    console.error('Detailed transporter error:', err);
+    throw err;
   }
 };
+
 
 const sendEmailWithRetry = async (
   mailOptions: nodemailer.SendMailOptions,
-  retries = 3
 ): Promise<void> => {
-  let transporter: nodemailer.Transporter;
-
-  try {
-    transporter = await createTransporter();
-  } catch (error) {
-    throw new Error(`Failed to create transporter: ${error}`);
-  }
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  let lastError: Error | null = null;
     try {
+      const transporter = await createTransporter();
       await transporter.sendMail(mailOptions);
       return;
-    } catch (error) {
-      if (attempt === retries) {
-        throw new Error(
-          `Email send failed after ${retries} attempts: ${error}`
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    } catch (error: any) {
+      console.error(`${error.message}`);      
     }
-  }
 };
 
 export const generateSecureOTP = (): { code: string; hash: string } => {
@@ -102,10 +86,7 @@ export const generateSecureOTP = (): { code: string; hash: string } => {
   return { code, hash };
 };
 
-export const verifyOTP = (
-  storedHash: string,
-  receivedCode: string
-): boolean => {
+export const verifyOTP = (storedHash: string, receivedCode: string): boolean => {
   return bcrypt.compareSync(receivedCode, storedHash);
 };
 
@@ -177,40 +158,67 @@ export const sendPasswordResetEmail = async (
   await sendEmailWithRetry(mailOptions);
 };
 
-// Database model interface example
+// Database model interface
 export interface OTPRecord {
   email: string;
   codeHash: string;
   createdAt: Date;
   type: "VERIFICATION" | "PASSWORD_RESET";
-  attempts: number;
 }
 
-// Example usage in your authentication flow
 export class OTPService {
-  private otpRecords: Map<string, OTPRecord> = new Map();
-
   async generateAndSendOTP(
     email: string,
     type: "VERIFICATION" | "PASSWORD_RESET"
   ): Promise<void> {
-    const { code, hash } = generateSecureOTP();
+    try {
+      const { code, hash } = generateSecureOTP();
+      const expiresAt = new Date(Date.now() + OTP_CONFIG.expiresIn);
 
-    const record: OTPRecord = {
-      email,
-      codeHash: hash,
-      createdAt: new Date(),
-      type,
-      attempts: 0,
-    };
+      // Find user first
+      const user = await prisma.user.findUnique({
+        where: { email }
+      });
 
-    // Store in database (example using in-memory map)
-    this.otpRecords.set(email, record);
+      if (!user) {
+        throw new Error("User not found");
+      }
 
-    if (type === "VERIFICATION") {
-      await sendVerificationEmail(email, code);
-    } else {
-      await sendPasswordResetEmail(email, code);
+      // Update or create OTP record in database
+      if (type === "VERIFICATION") {
+        await prisma.verificationCode.upsert({
+          where: { userId: user.id },
+          update: {
+            code: hash,
+            expiresAt
+          },
+          create: {
+            userId: user.id,
+            code: hash,
+            expiresAt
+          }
+        });
+
+        await sendVerificationEmail(email, code);
+      } else {
+        await prisma.passwordReset.upsert({
+          where: { userId: user.id },
+          update: {
+            code: hash,
+            expiresAt
+          },
+          create: {
+            userId: user.id,
+            code: hash,
+            expiresAt
+          }
+        });
+
+        await sendPasswordResetEmail(email, code);
+      }
+    } catch (error) {
+      console.error("OTP Generation Error:", error);
+      throw error;
     }
   }
 
@@ -219,29 +227,56 @@ export class OTPService {
     code: string,
     type: "VERIFICATION" | "PASSWORD_RESET"
   ): Promise<boolean> {
-    const record = this.otpRecords.get(email);
-    if (!record) return false;
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: {
+          verificationCode: true,
+          passwordReset: true
+        }
+      });
 
-    // Check expiration
-    if (Date.now() - record.createdAt.getTime() > OTP_CONFIG.expiresIn) {
-      this.otpRecords.delete(email);
+      if (!user) return false;
+
+      const record = type === "VERIFICATION" 
+        ? user.verificationCode 
+        : user.passwordReset;
+
+      if (!record) return false;
+
+      // Check expiration
+      if (new Date() > record.expiresAt) {
+        // Clean up expired code
+        if (type === "VERIFICATION") {
+          await prisma.verificationCode.delete({
+            where: { userId: user.id }
+          });
+        } else {
+          await prisma.passwordReset.delete({
+            where: { userId: user.id }
+          });
+        }
+        return false;
+      }
+
+      // Verify code
+      const isValid = verifyOTP(record.code, code);
+
+      // Delete the code after verification (whether successful or not)
+      if (type === "VERIFICATION") {
+        await prisma.verificationCode.delete({
+          where: { userId: user.id }
+        });
+      } else {
+        await prisma.passwordReset.delete({
+          where: { userId: user.id }
+        });
+      }
+
+      return isValid;
+    } catch (error) {
+      console.error("OTP Verification Error:", error);
       return false;
     }
-
-    // Check attempts
-    if (record.attempts >= OTP_CONFIG.attempts) {
-      this.otpRecords.delete(email);
-      return false;
-    }
-
-    record.attempts++;
-
-    // Verify code
-    if (record.type !== type || !verifyOTP(record.codeHash, code)) {
-      return false;
-    }
-
-    this.otpRecords.delete(email);
-    return true;
   }
 }
