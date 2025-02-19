@@ -7,8 +7,8 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../../utils/generateToken";
-import { OTPService, generateSecureOTP } from "../../utils/emailService";
 import jwt, { TokenExpiredError } from "jsonwebtoken";
+import { OTPService } from "../../emails/otp/otp";
 
 const prisma = new PrismaClient();
 const otpService = new OTPService();
@@ -45,42 +45,33 @@ export const signUp = async (
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const { code, hash } = generateSecureOTP();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Start a transaction to ensure data consistency
-    await prisma.$transaction(async (prisma) => {
-      const user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          role: "USER",
-          password: hashedPassword,
-          verificationCode: {
-            create: {
-              code: hash,
-              expiresAt,
-            },
-          },
-        },
-      });
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        role: "USER",
+        password: hashedPassword,
+      },
+    });
 
-      try {
-        await otpService.generateAndSendOTP(email, "VERIFICATION");
-      } catch (emailError) {
-        // If email fails, roll back the user creation
-        throw new Error(`Failed to send verification email: ${emailError}`);
-      }
+    // Send verification email right after user creation
+    try {
+      await otpService.generateAndSendOTP(email, "VERIFICATION");
+    } catch (emailError) {
+      // If email fails, we'll log it but won't fail the signup
+      console.error("Failed to send verification email:", emailError);
+    }
 
-      res.status(201).json({
-        statusCode: 201,
-        message: "User created. Please check your email for verification code.",
-        data: {
-          name: user.name,
-          id: user.id,
-          email: user.email,
-        },
-      });
+    res.status(201).json({
+      statusCode: 201,
+      message:
+        "User created successfully. Please check your email for verification.",
+      data: {
+        name: user.name,
+        id: user.id,
+        email: user.email,
+      },
     });
   } catch (error: unknown) {
     next(
@@ -161,10 +152,31 @@ export const verifyEmail = async (
   const { email, otp } = req.body;
 
   try {
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      next(errorHandler(404, "User not found"));
+      return;
+    }
+
+    // Check if email is already verified
+    if (user.isVerified) {
+      next(errorHandler(400, "Email is already verified"));
+      return;
+    }
+
     const isValid = await otpService.verifyOTP(email, otp, "VERIFICATION");
-    
+
     if (!isValid) {
-      next(errorHandler(400, "Invalid or expired verification code. Please request a new one."));
+      next(
+        errorHandler(
+          400,
+          "Invalid or expired verification code. Please request a new one."
+        )
+      );
       return;
     }
 
@@ -225,6 +237,25 @@ export const resetPassword = async (
       return;
     }
 
+    // Get the user and check if new password matches current password
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      next(errorHandler(404, "User not found"));
+      return;
+    }
+
+    // Check if new password matches current password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      next(
+        errorHandler(400, "New password cannot be the same as current password")
+      );
+      return;
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.user.update({
@@ -240,7 +271,6 @@ export const resetPassword = async (
     next(errorHandler(500, "Failed to reset password"));
   }
 };
-
 export const resendVerificationCode = async (
   req: Request,
   res: Response,
