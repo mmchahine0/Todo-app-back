@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import * as dotenv from "dotenv";
 import connectDB from "./database";
+import { setupSEO } from "./features/seo/index";
 import authRoutes from "./features/auth/auth.route";
 import todoRoutes from "./features/todos/todos.route";
 import errorMiddleware from "../src/middleware/errorMiddleware";
@@ -26,6 +27,10 @@ app.use(
   })
 );
 app.use(cookieParser());
+
+// Setup SEO features
+setupSEO(app);
+
 connectDB();
 
 // Routes
@@ -40,12 +45,6 @@ app.use("/api/v1", dynamicpagesRoutes);
 // Error handling middleware
 app.use(errorMiddleware);
 
-app
-  .listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(`CORS Origin: ${process.env.CORS_ORIGIN}`);
-  })
-  .on("error", (err) => {
-    console.error("Server failed to start:", err);
-  });
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
