@@ -15,7 +15,7 @@ import cookieParser from "cookie-parser";
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = parseInt(process.env.PORT || "4000", 10);
 app.set("trust proxy", 1);
 
 app.use(express.json());
@@ -40,6 +40,12 @@ app.use("/api/v1", dynamicpagesRoutes);
 // Error handling middleware
 app.use(errorMiddleware);
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+app
+  .listen(port, "0.0.0.0", () => {
+    console.log(`Server is running on port ${port}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`CORS Origin: ${process.env.CORS_ORIGIN}`);
+  })
+  .on("error", (err) => {
+    console.error("Server failed to start:", err);
+  });
