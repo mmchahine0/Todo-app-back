@@ -17,7 +17,7 @@
     "redis": "^4.7.0"
   },
   "scripts": {
-    "dev": "nodemon src/index.ts",
+    "dev": "ts-node-dev --transpile-only src/index.ts",
     "build": "npx prisma generate && npx prisma migrate deploy && tsc",
     "start": "node dist/index.js"
   },
