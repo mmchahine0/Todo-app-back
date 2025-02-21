@@ -3,6 +3,7 @@ import { google } from "googleapis";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
+
 const OAuth2 = google.auth.OAuth2;
 
 const createTransporter = async (): Promise<nodemailer.Transporter> => {
@@ -13,7 +14,6 @@ const createTransporter = async (): Promise<nodemailer.Transporter> => {
       "https://developers.google.com/oauthplayground"
     );
 
-    // Add scopes explicitly
     oauth2Client.setCredentials({
       refresh_token: process.env.GMAIL_REFRESH_TOKEN,
       scope: [
@@ -34,11 +34,10 @@ const createTransporter = async (): Promise<nodemailer.Transporter> => {
       },
     });
 
-    // Verify configuration
     await transporter.verify();
     return transporter;
   } catch (err) {
-    console.error("Detailed transporter error:", err);
+    console.error("Error creating transporter:", err);
     throw err;
   }
 };
