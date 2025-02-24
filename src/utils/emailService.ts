@@ -22,17 +22,21 @@ const createTransporter = async (): Promise<nodemailer.Transporter> => {
       ].join(" "),
     });
 
+    const accessToken = await oauth2Client.getAccessToken();
+
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         type: "OAuth2",
         user: process.env.GMAIL_EMAIL,
         clientId: process.env.GMAIL_CLIENT_ID,
         clientSecret: process.env.GMAIL_CLIENT_SECRET,
         refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-        accessToken: process.env.GMAIL_ACCESS_TOKEN,
+        accessToken: accessToken,
       },
-    });
+    } as nodemailer.TransportOptions);
 
     // Verify configuration
     await transporter.verify();

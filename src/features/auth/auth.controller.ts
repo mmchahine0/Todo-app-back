@@ -149,12 +149,12 @@ export const verifyEmail = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { email, otp } = req.body;
+  const { email, code } = req.body;
 
   try {
-    // Check if user exists
     const user = await prisma.user.findUnique({
       where: { email },
+      include: { verificationCode: true },
     });
 
     if (!user) {
@@ -162,27 +162,31 @@ export const verifyEmail = async (
       return;
     }
 
-    // Check if email is already verified
     if (user.isVerified) {
       next(errorHandler(400, "Email is already verified"));
       return;
     }
 
-    const isValid = await otpService.verifyOTP(email, otp, "VERIFICATION");
-
-    if (!isValid) {
-      next(
-        errorHandler(
-          400,
-          "Invalid or expired verification code. Please request a new one."
-        )
-      );
+    if (
+      !user.verificationCode ||
+      user.verificationCode.code !== code ||
+      user.verificationCode.expiresAt < new Date()
+    ) {
+      next(errorHandler(400, "Invalid or expired verification code"));
       return;
     }
 
-    await prisma.user.update({
-      where: { email },
-      data: { isVerified: true },
+    // Start a transaction to update user and delete verification code
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+      });
+
+      // Delete the verification code
+      await tx.verificationCode.delete({
+        where: { userId: user.id },
+      });
     });
 
     res.json({
@@ -230,16 +234,9 @@ export const resetPassword = async (
   const { email, code, newPassword } = req.body;
 
   try {
-    const isValid = await otpService.verifyOTP(email, code, "PASSWORD_RESET");
-
-    if (!isValid) {
-      next(errorHandler(400, "Invalid or expired reset code"));
-      return;
-    }
-
-    // Get the user and check if new password matches current password
     const user = await prisma.user.findUnique({
       where: { email },
+      include: { passwordReset: true },
     });
 
     if (!user) {
@@ -247,7 +244,15 @@ export const resetPassword = async (
       return;
     }
 
-    // Check if new password matches current password
+    if (
+      !user.passwordReset ||
+      user.passwordReset.code !== code ||
+      user.passwordReset.expiresAt < new Date()
+    ) {
+      next(errorHandler(400, "Invalid or expired reset code"));
+      return;
+    }
+
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       next(
@@ -258,9 +263,17 @@ export const resetPassword = async (
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
-      where: { email },
-      data: { password: hashedPassword },
+    // Start a transaction to update password and delete reset code
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
+
+      // Delete the password reset code
+      await tx.passwordReset.delete({
+        where: { userId: user.id },
+      });
     });
 
     res.json({
