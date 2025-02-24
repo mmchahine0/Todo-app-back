@@ -88,6 +88,7 @@ export const signIn = async (
   next: NextFunction
 ): Promise<void> => {
   const { email, password } = req.body;
+  console.log("signnninnnnn", email, password)
   try {
     const user = await prisma.user.findUnique({
       where: { email },
