@@ -88,7 +88,6 @@ export const signIn = async (
   next: NextFunction
 ): Promise<void> => {
   const { email, password } = req.body;
-  console.log("signnninnnnn", email, password)
   try {
     const user = await prisma.user.findUnique({
       where: { email },
@@ -145,6 +144,7 @@ export const signIn = async (
     next(errorHandler(500, "Failed to sign in"));
   }
 };
+
 export const verifyEmail = async (
   req: Request,
   res: Response,
@@ -245,11 +245,7 @@ export const resetPassword = async (
       return;
     }
 
-    if (
-      !user.passwordReset ||
-      user.passwordReset.code !== code ||
-      user.passwordReset.expiresAt < new Date()
-    ) {
+    if (!user.passwordReset || user.passwordReset.expiresAt < new Date()) {
       next(errorHandler(400, "Invalid or expired reset code"));
       return;
     }
@@ -280,11 +276,16 @@ export const resetPassword = async (
     res.json({
       statusCode: 200,
       message: "Password reset successful",
+      data: {
+        email: user.email,
+        updatedAt: new Date().toISOString(),
+      },
     });
   } catch (error) {
     next(errorHandler(500, "Failed to reset password"));
   }
 };
+
 export const resendVerificationCode = async (
   req: Request,
   res: Response,
@@ -324,6 +325,7 @@ export const resendVerificationCode = async (
     next(errorHandler(500, "Failed to resend verification code"));
   }
 };
+
 export const refreshAccessToken = async (
   req: Request,
   res: Response,
