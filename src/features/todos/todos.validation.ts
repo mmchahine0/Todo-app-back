@@ -4,6 +4,14 @@ export const createTodoValidation = () => {
   return [
     body("title").isString().withMessage("Title must be a string"),
     body("content").isString().withMessage("Content must be a string"),
+    body("collaborators")
+      .optional()
+      .isArray()
+      .withMessage("Collaborators must be an array"),
+    body("collaborators.*")
+      .optional()
+      .isString()
+      .withMessage("Each collaborator ID must be a string"),
   ];
 };
 
@@ -14,6 +22,24 @@ export const updateTodoValidation = () => {
       .optional()
       .isString()
       .withMessage("Content must be a string"),
+    body("completed")
+      .optional()
+      .isBoolean()
+      .withMessage("Completed must be a boolean"),
+  ];
+};
+
+export const collaboratorValidation = () => {
+  return [
+    body("collaboratorId")
+      .isString()
+      .withMessage("Collaborator ID must be a string"),
+  ];
+};
+
+export const commentValidation = () => {
+  return [
+    body("content").isString().withMessage("Comment content must be a string"),
   ];
 };
 

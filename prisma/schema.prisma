@@ -19,6 +19,8 @@ model User {
   passwordReset   PasswordReset?
   todos           Todo[]
   dynamicPages    DynamicPage[]
+  connections     Connection[]
+  notifications   Notification[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt @default(now())
 }
@@ -47,14 +49,16 @@ enum Role {
 }
 
 model Todo {
-  id        String    @id @default(cuid())
-  title     String
-  content   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt @default(now())
-  completed Boolean   @default(false)
-  user      User      @relation(fields: [userId], references: [id])
-  userId    String
+  id            String      @id @default(cuid())
+  title         String
+  content       String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt @default(now())
+  completed     Boolean     @default(false)
+  user          User        @relation(fields: [userId], references: [id])
+  userId        String
+  collaborators TodoCollaborator[]
+  comments      TodoComment[]
 }
 
 model DynamicPage {
@@ -89,4 +93,41 @@ model ContentSection {
   type      String    @unique  
   content   Json      
   updatedAt DateTime  @updatedAt @default(now())
+}
+
+model Connection {
+  id          String    @id @default(cuid())
+  socketId    String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  connectedAt DateTime  @default(now())
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  message     String
+  read        Boolean   @default(false)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  todoId      String?
+  createdAt   DateTime  @default(now())
+}
+
+model TodoCollaborator {
+  id        String    @id @default(cuid())
+  todo      Todo      @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  todoId    String
+  userId    String
+  addedAt   DateTime  @default(now())
+  
+  @@unique([todoId, userId])
+}
+
+model TodoComment {
+  id        String    @id @default(cuid())
+  content   String
+  todo      Todo      @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  todoId    String
+  userId    String
+  createdAt DateTime  @default(now())
 }

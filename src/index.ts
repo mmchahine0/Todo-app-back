@@ -12,10 +12,17 @@ import pageContentRoutes from "./features/admin/pages/pageContent.route";
 import contentRoutes from "./features/admin/content/content.route";
 import dynamicpagesRoutes from "./features/admin/pages/dynamic/dynamicPages.route";
 import cookieParser from "cookie-parser";
+import http from 'http';
+import { initSocketService } from './utils/websocketService';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize socket service with the HTTP server
+initSocketService(server);
+
 const port = process.env.PORT || 4000;
 app.set("trust proxy", 1);
 
