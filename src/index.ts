@@ -12,8 +12,8 @@ import pageContentRoutes from "./features/admin/pages/pageContent.route";
 import contentRoutes from "./features/admin/content/content.route";
 import dynamicpagesRoutes from "./features/admin/pages/dynamic/dynamicPages.route";
 import cookieParser from "cookie-parser";
-import http from 'http';
-import { initSocketService } from './utils/websocketService';
+import http from "http";
+import { initSocketService } from "./utils/websocketService";
 
 dotenv.config();
 
@@ -23,7 +23,7 @@ const server = http.createServer(app);
 // Initialize socket service with the HTTP server
 initSocketService(server);
 
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 3500;
 app.set("trust proxy", 1);
 
 app.use(express.json());
@@ -52,6 +52,6 @@ app.use("/api/v1", dynamicpagesRoutes);
 // Error handling middleware
 app.use(errorMiddleware);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

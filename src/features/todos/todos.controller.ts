@@ -3,7 +3,10 @@ import prisma from "../../database/prismaClient";
 import { JwtPayload } from "jsonwebtoken";
 import { errorHandler } from "../../utils/error";
 import redisClient from "../../utils/redis";
-import { getSocketService,getSocketServiceIo } from "../../utils/websocketService";
+import {
+  getSocketService,
+  getSocketServiceIo,
+} from "../../utils/websocketService";
 
 const getUserId = (req: Request): string => {
   const user = req.user as JwtPayload;
@@ -12,19 +15,22 @@ const getUserId = (req: Request): string => {
   }
   return user.userId;
 };
-const validateTodoAccess = async (todoId: string, userId: string): Promise<boolean> => {
+const validateTodoAccess = async (
+  todoId: string,
+  userId: string
+): Promise<boolean> => {
   // Check if user is the owner
   const todo = await prisma.todo.findFirst({
     where: { id: todoId, userId },
   });
-  
+
   if (todo) return true;
-  
+
   // Check if user is a collaborator
   const collaborator = await prisma.todoCollaborator.findFirst({
     where: { todoId, userId },
   });
-  
+
   return !!collaborator;
 };
 export const getTodoByUserId = async (
@@ -141,8 +147,12 @@ export const createTodo = async (
     });
 
     // Add collaborators if provided
-    if (collaborators && Array.isArray(collaborators) && collaborators.length > 0) {
-      const collaboratorRecords = collaborators.map(collaboratorId => ({
+    if (
+      collaborators &&
+      Array.isArray(collaborators) &&
+      collaborators.length > 0
+    ) {
+      const collaboratorRecords = collaborators.map((collaboratorId) => ({
         todoId: newTodo.id,
         userId: collaboratorId,
       }));
@@ -284,7 +294,7 @@ export const deleteTodo = async (
 
     // Get collaborators to notify them
     const collaborators = await prisma.todoCollaborator.findMany({
-      where: { todoId: id }
+      where: { todoId: id },
     });
 
     // Delete the todo
@@ -329,6 +339,7 @@ export const deleteTodo = async (
   }
 };
 
+// Updated addCollaborator function for the todos.controller.ts file
 export const addCollaborator = async (
   req: Request,
   res: Response,
@@ -391,6 +402,16 @@ export const addCollaborator = async (
       id
     );
 
+    // This will make the todo appear in the collaborator's list immediately
+    socketService.emitTodoCreated({
+      ...todo,
+      isCollaborator: true,
+      collaboratorId: collaboratorId,
+    });
+
+    // Clear cache to ensure the todo shows up in the collaborator's next fetch
+    await redisClient.clearCache();
+
     res.status(201).json({
       statusCode: 201,
       message: "Collaborator added successfully",
@@ -448,7 +469,7 @@ export const addComment = async (
     }
 
     // Emit a socket event with the new comment
-    getSocketServiceIo().to(`todo:${id}`).emit('todo:comment', comment);
+    getSocketServiceIo().to(`todo:${id}`).emit("todo:comment", comment);
 
     res.status(201).json({
       statusCode: 201,
@@ -484,7 +505,7 @@ export const getTodoComments = async (
     // Get comments
     const comments = await prisma.todoComment.findMany({
       where: { todoId: id },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     res.json({
@@ -513,7 +534,7 @@ export const getUserNotifications = async (
     // Get notifications
     const notifications = await prisma.notification.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     res.json({

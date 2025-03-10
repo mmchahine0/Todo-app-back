@@ -1,7 +1,7 @@
-import { Server as SocketServer } from 'socket.io';
-import { Server } from 'http';
-import prisma from '../database/prismaClient';
-import jwt from 'jsonwebtoken';
+import { Server as SocketServer } from "socket.io";
+import { Server } from "http";
+import prisma from "../database/prismaClient";
+import jwt from "jsonwebtoken";
 
 class SocketService {
   private io: SocketServer;
@@ -9,9 +9,14 @@ class SocketService {
   constructor(server: Server) {
     this.io = new SocketServer(server, {
       cors: {
-        origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-        credentials: true
-      }
+        origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+        credentials: true,
+        methods: ["GET", "POST"],
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000,
+      transports: ["websocket", "polling"],
+      allowEIO3: true,
     });
 
     this.setupSocketAuth();
@@ -22,119 +27,167 @@ class SocketService {
     this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth.token;
+
         if (!token) {
-          return next(new Error('Authentication error'));
+          return next(new Error("Authentication token required"));
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
-        
-        // Store user information in socket
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+          userId: string;
+        };
+
+        if (!decoded.userId) {
+          return next(new Error("Invalid authentication token"));
+        }
+
         socket.data.userId = decoded.userId;
-        
-        // Register this connection in database
+
+        // Clean up any existing connections for this socket ID
+        await prisma.connection.deleteMany({
+          where: { socketId: socket.id },
+        });
+
+        // Register new connection
         await prisma.connection.create({
           data: {
             socketId: socket.id,
             userId: decoded.userId,
-          }
+          },
         });
 
         next();
       } catch (error) {
-        next(new Error('Authentication error'));
+        console.error("Socket authentication error:", error);
+        next(new Error("Authentication failed"));
       }
     });
   }
 
   private setupEventHandlers() {
-    this.io.on('connection', async (socket) => {
-      console.log(`User connected: ${socket.data.userId} (Socket ID: ${socket.id})`);
-      
-      // Handle disconnection
-      socket.on('disconnect', async () => {
+    this.io.on("connection", async (socket) => {
+      console.log(
+        `User connected: ${socket.data.userId} (Socket ID: ${socket.id})`
+      );
+
+      socket.on("join:todo", async (todoId: string) => {
         try {
-          await prisma.connection.deleteMany({
-            where: { socketId: socket.id }
-          });
-          console.log(`User disconnected: ${socket.data.userId}`);
+          const canAccess = await this.verifyTodoAccess(
+            todoId,
+            socket.data.userId
+          );
+          if (canAccess) {
+            socket.join(`todo:${todoId}`);
+            console.log(
+              `User ${socket.data.userId} joined todo room ${todoId}`
+            );
+          }
         } catch (error) {
-          console.error('Error handling disconnect:', error);
+          console.error("Error joining todo room:", error);
         }
       });
 
-      // Join rooms for todos the user is collaborating on
-      try {
-        const userTodos = await prisma.todo.findMany({
-          where: { userId: socket.data.userId }
-        });
-        
-        const collaborations = await prisma.todoCollaborator.findMany({
-          where: { userId: socket.data.userId }
-        });
-        
-        // Join socket rooms for all todos the user owns or collaborates on
-        const allTodoIds = [
-          ...userTodos.map(todo => todo.id),
-          ...collaborations.map(collab => collab.todoId)
-        ];
-        
-        allTodoIds.forEach(todoId => {
-          socket.join(`todo:${todoId}`);
-        });
-      } catch (error) {
-        console.error('Error setting up user rooms:', error);
-      }
+      socket.on("leave:todo", (todoId: string) => {
+        socket.leave(`todo:${todoId}`);
+        console.log(`User ${socket.data.userId} left todo room ${todoId}`);
+      });
+
+      socket.on("disconnect", async () => {
+        try {
+          await prisma.connection.deleteMany({
+            where: { socketId: socket.id },
+          });
+          console.log(`User disconnected: ${socket.data.userId}`);
+        } catch (error) {
+          console.error("Error handling disconnect:", error);
+        }
+      });
     });
   }
 
-  // Emit updates to all clients watching a specific todo
+  private async verifyTodoAccess(
+    todoId: string,
+    userId: string
+  ): Promise<boolean> {
+    const todo = await prisma.todo.findFirst({
+      where: { id: todoId, userId },
+    });
+
+    if (todo) return true;
+
+    const collaborator = await prisma.todoCollaborator.findFirst({
+      where: { todoId, userId },
+    });
+
+    return !!collaborator;
+  }
+
   public emitTodoUpdate(todoId: string, data: any) {
-    this.io.to(`todo:${todoId}`).emit('todo:updated', data);
+    this.io.to(`todo:${todoId}`).emit("todo:updated", data);
   }
+  private async sendTodoToCollaborator(collaboratorId: string, todoData: any) {
+    try {
+      // Find all active connections for this collaborator
+      const connections = await prisma.connection.findMany({
+        where: { userId: collaboratorId },
+      });
 
-  // Emit todo creation to all connected clients
-  public emitTodoCreated(data: any) {
-    this.io.emit('todo:created', data);
-  }
-
-  // Emit todo deletion to all clients watching that todo
-  public emitTodoDeleted(todoId: string) {
-    this.io.to(`todo:${todoId}`).emit('todo:deleted', { id: todoId });
-  }
-
-  public getIo(){
-    if (!this.io){
-        throw new Error('Socket service io not initialized');
+      // Send the todo directly to all of the collaborator's active connections
+      connections.forEach((connection) => {
+        this.io.to(connection.socketId).emit("todo:shared", {
+          ...todoData,
+          isCollaborator: true,
+        });
+      });
+    } catch (error) {
+      console.error("Error sending todo to collaborator:", error);
     }
-    return this.io
   }
-  // Create and send notification
-  public async sendNotification(userId: string, message: string, todoId?: string) {
+  public emitTodoCreated(data: any) {
+    this.io.emit("todo:created", data);
+
+    if (data.collaboratorId) {
+      this.sendTodoToCollaborator(data.collaboratorId, data);
+    }
+  }
+
+  public emitTodoDeleted(todoId: string) {
+    this.io.to(`todo:${todoId}`).emit("todo:deleted", { id: todoId });
+  }
+
+  public async sendNotification(
+    userId: string,
+    message: string,
+    todoId?: string
+  ) {
     try {
       const notification = await prisma.notification.create({
         data: {
           message,
           userId,
-          todoId
-        }
+          todoId,
+        },
       });
 
-      // Find all socket connections for this user
       const connections = await prisma.connection.findMany({
-        where: { userId }
+        where: { userId },
       });
 
-      // Emit to all user's connections
-      connections.forEach(connection => {
-        this.io.to(connection.socketId).emit('notification', notification);
+      connections.forEach((connection) => {
+        this.io.to(connection.socketId).emit("notification", notification);
       });
 
       return notification;
     } catch (error) {
-      console.error('Error sending notification:', error);
+      console.error("Error sending notification:", error);
     }
   }
-  
+
+  public getIo() {
+    if (!this.io) {
+      throw new Error("Socket.IO instance not initialized");
+    }
+    return this.io;
+  }
 }
 
 let socketService: SocketService;
@@ -146,14 +199,14 @@ export const initSocketService = (server: Server) => {
 
 export const getSocketService = () => {
   if (!socketService) {
-    throw new Error('Socket service not initialized');
+    throw new Error("Socket service not initialized");
   }
   return socketService;
 };
 
 export const getSocketServiceIo = () => {
-    if (!socketService) {
-      throw new Error('Socket service not initialized');
-    }
-    return socketService.getIo();
+  if (!socketService) {
+    throw new Error("Socket service not initialized");
+  }
+  return socketService.getIo();
 };
